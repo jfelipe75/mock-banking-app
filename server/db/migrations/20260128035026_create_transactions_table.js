@@ -20,7 +20,6 @@ exports.up = function(knex) {
         .references('user_id')
         .inTable('users')
 
-
         table.uuid('from_account_id')
         .nullable()
         .references('account_id')
