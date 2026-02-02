@@ -71,7 +71,16 @@ async function transferFunds({
    */
   
   try {
-    return await knex.transaction(async (trx) => {
+    return await knex.transaction(async (trx) => { // this line is how we enforce atomicity
+        /**
+         * Every query that uses trx(...):
+
+    - inside the same database transaction
+
+    - shares the same atomic boundary
+
+    - will be committed or rolled back together
+         */
       /**
        * STEP 2 — Idempotency check (TRANSFER only)
      * ------------------------------------------
@@ -88,7 +97,7 @@ async function transferFunds({
         idempotency_key: idempotencyKey,
         type: 'TRANSFER'
       })
-      .first();
+      .first(); // give me only the first row, not an array of rows
 
     if (existingTransaction) {
       // Return stored response_payload for idempotent replay
@@ -117,7 +126,7 @@ async function transferFunds({
         amount: amount,
         idempotency_key: idempotencyKey
       })
-      .returning('*');
+      .returning('*'); // after inserting the row, give me back the full row
 
     const transactionId = transactionRow.transaction_id;
 
@@ -162,7 +171,7 @@ async function transferFunds({
       .first();
 
     let rejectionReason = null;
-
+// set the correct rejection_reason
     if (!fromAccount) {
       rejectionReason = 'FROM_ACCOUNT_NOT_FOUND';
     } else if (fromAccount.status !== 'ACTIVE') {
@@ -172,7 +181,7 @@ async function transferFunds({
     } else if (toAccount.status !== 'ACTIVE') {
       rejectionReason = 'TO_ACCOUNT_NOT_ACTIVE';
     }
-
+// if there is a rejection reason then mark transactions and audit log as rejected 
     if (rejectionReason) {
       const rejectionPayload = {
         success: false,
@@ -228,7 +237,7 @@ async function transferFunds({
     const debitRowsAffected = await trx('accounts')
       .where({ account_id: fromAccountId, status: 'ACTIVE' })
       .whereRaw('current_balance >= ?', [amount])
-      .update({
+      .update({ // update in knex library returns the number of affected rows by default
         current_balance: trx.raw('current_balance - ?', [amount])
       });
 
