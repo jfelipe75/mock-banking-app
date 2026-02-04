@@ -1,3 +1,4 @@
+require('dotenv').config({ path: '.env.test' });
 require('dotenv').config();
 const path = require('path');
 
@@ -31,12 +32,12 @@ module.exports = {
 
   test: {
     client: 'pg',
-    connection: process.env.PG_CONNECTION_STRING || {
-      host: process.env.PG_HOST || '127.0.0.1',
-      port: process.env.PG_PORT || 5432,
-      user: process.env.PG_USER || 'postgres',
-      password: process.env.PG_PASS || 'postgres',
-      database: process.env.PG_DB || 'mock-bank-test', // test DB
+    connection: process.env.PG_CONNECTION_STRING_TEST || {
+      host: process.env.PG_HOST_TEST || '127.0.0.1',
+      port: process.env.PG_PORT_TEST || 5432,
+      user: process.env.PG_USER_TEST || 'postgres',
+      password: process.env.PG_PASS_TEST || '',
+      database: process.env.PG_DB_TEST || 'mock-bank-test', // test DB
     },
     migrations: {
       directory: migrationsDirectory,
