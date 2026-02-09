@@ -14,7 +14,7 @@
     "seed": "knex seed:run",
     "seed:make": "knex seed:make",
     "lint": "eslint . --fix",
-    "test": "jest"
+    "test": "jest --runInBand"
   },
   "keywords": [],
   "author": "",
@@ -29,6 +29,11 @@
     "express-session": "^1.17.3",
     "knex": "^2.4.2",
     "pg": "^8.10.0"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "globalSetup": "<rootDir>/tests/setupTestDB.js",
+    "globalTeardown": "<rootDir>/tests/globalTeardownDB.js"
   },
   "devDependencies": {
     "eslint": "^8.39.0",

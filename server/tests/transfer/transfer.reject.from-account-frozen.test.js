@@ -28,17 +28,6 @@ describe('Transfer Service — FROM_ACCOUNT_FROZEN Rejection', () => {
   const initialToBalance = 2000;
   const transferAmount = 1000;
 
-  beforeAll(async () => {
-    // Ensure schema is up to date for test DB
-    await knex.migrate.rollback(undefined, true);
-    await knex.migrate.latest();
-  });
-
-  afterAll(async () => {
-    // Close DB connection after tests
-    await knex.destroy();
-  });
-
   test('Transfer is REJECTED when fromAccount is FROZEN', async () => {
     // ==================== ARRANGE ====================
     // - create user
