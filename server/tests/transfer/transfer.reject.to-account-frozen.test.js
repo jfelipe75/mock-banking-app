@@ -28,15 +28,7 @@ describe('Transfer Service — TO_ACCOUNT_FROZEN Rejection', () => {
   const initialToBalance = 2000;
   const transferAmount = 1000;
 
-  beforeAll(async () => {
-    await knex.migrate.rollback(undefined, true);
-    await knex.migrate.latest();
-  });
-
-  afterAll(async () => {
-    await knex.destroy();
-  });
-
+  
   test('Transfer is REJECTED when toAccount is FROZEN', async () => {
     // ==================== ARRANGE ====================
 

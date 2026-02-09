@@ -21,16 +21,6 @@ describe('Transfer Service — Successful Transfer', () => {
   let toAccountId;
   let idempotencyKey;
 
-  beforeAll(async () => {
-    // Run migrations to ensure schema is up to date
-    await knex.migrate.rollback(undefined, true);
-    await knex.migrate.latest();
-  });
-
-  afterAll(async () => {
-    // Clean up and close connection
-    await knex.destroy();
-  });
 
   test('Successful transfer updates balances, ledger, transactions, and audit logs correctly', async () => {
     // ==================== ARRANGE ====================

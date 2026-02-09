@@ -25,15 +25,6 @@ describe('Transfer Service — Idempotency Replay', () => {
   const initialToBalance = 5000;
   const transferAmount = 3000;
 
-  beforeAll(async () => {
-    await knex.migrate.rollback(undefined, true);
-    await knex.migrate.latest();
-  });
-
-  afterAll(async () => {
-    await knex.destroy();
-  });
-
   test('Replaying a transfer with the same idempotency key returns the same result without side effects', async () => {
     // ==================== ARRANGE ====================
 

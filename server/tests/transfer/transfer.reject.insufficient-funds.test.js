@@ -24,17 +24,7 @@ describe('Transfer Service — INSUFFICIENT_FUNDS Rejection', () => {
   const initialToBalance = 2000;
   const transferAmount = 1000; // Greater than fromAccount balance
 
-  beforeAll(async () => {
-    // Run migrations to ensure schema is up to date
-    await knex.migrate.rollback(undefined, true);
-    await knex.migrate.latest();
-  });
-
-  afterAll(async () => {
-    // Clean up and close connection
-    await knex.destroy();
-  });
-
+  
   test('Transfer is REJECTED when amount exceeds fromAccount balance', async () => {
     // ==================== ARRANGE ====================
 
