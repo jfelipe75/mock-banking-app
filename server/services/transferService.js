@@ -24,7 +24,8 @@ async function transferFunds({
   fromAccountId,
   toAccountId,
   amount,
-  idempotencyKey
+  idempotencyKey,
+  failpoint = null // test-only: inject failures for integration tests
 }) {
   /**
    * STEP 0 — Validate input shape (cheap, synchronous)
@@ -255,7 +256,7 @@ async function transferFunds({
         .update({
           status: 'REJECTED',
           failure_reason: 'INSUFFICIENT_FUNDS',
-          response_payload: JSON.stringify(rejectionPayload)
+          response_payload: rejectionPayload
         });
 
       await trx('audit_logs').insert({
@@ -269,6 +270,11 @@ async function transferFunds({
       });
 
       return rejectionPayload;
+    }
+
+    // TEST-ONLY: Failpoint injection for integration tests
+    if (failpoint === 'AFTER_DEBIT_BEFORE_CREDIT') {
+      throw new Error('CREDIT_FAILED_ROLLBACK');
     }
 
     const creditRowsAffected = await trx('accounts')
@@ -375,6 +381,75 @@ async function transferFunds({
       idempotencyKey,
       error: error.message
     });
+
+    /**
+     * Record FAILED status and SYSTEM audit log
+     * ------------------------------------------
+     * The original transaction was rolled back.
+     * We need a new transaction to record the failure.
+     */
+    const failureReason = error.message || 'UNKNOWN_SYSTEM_FAILURE';
+
+    try {
+      await knex.transaction(async (trx) => {
+        // The main transaction rolled back, so the PENDING row may not exist.
+// If it exists (rare), update it. Otherwise create a FAILED record.
+        const existingTx = await trx('transactions')
+          .where({
+            initiator_user_id: initiatorUserId,
+            idempotency_key: idempotencyKey,
+            type: 'TRANSFER'
+          })
+          .first();
+
+        let transactionId;
+
+        if (existingTx) {
+          // Update existing transaction to FAILED
+          transactionId = existingTx.transaction_id;
+          await trx('transactions')
+            .where({ transaction_id: transactionId })
+            .update({
+              status: 'FAILED',
+              failure_reason: failureReason,
+              response_payload: {
+                success: false,
+                transactionId: transactionId,
+                status: 'FAILED',
+                reason: failureReason
+              }
+            });
+        } else {
+          // Create a new FAILED transaction record
+          const [newTx] = await trx('transactions')
+            .insert({
+              status: 'FAILED',
+              type: 'TRANSFER',
+              initiator_user_id: initiatorUserId,
+              from_account_id: fromAccountId,
+              to_account_id: toAccountId,
+              amount: amount,
+              idempotency_key: idempotencyKey,
+              failure_reason: failureReason
+            })
+            .returning('*');
+          transactionId = newTx.transaction_id;
+        }
+
+        // Record SYSTEM audit log for the failure
+        await trx('audit_logs').insert({
+          actor_type: 'SYSTEM',
+          actor_id: 'TRANSFER_SERVICE',
+          action: 'TRANSFER',
+          target_type: 'TRANSACTION',
+          target_id: transactionId,
+          outcome: 'FAILED',
+          reason: failureReason
+        });
+      });
+    } catch (recordError) {
+      console.error('[TransferService] Failed to record system failure:', recordError.message);
+    }
 
     // Rethrow cleanly
     throw new Error(`TRANSFER_SYSTEM_FAILURE: ${error.message}`);
