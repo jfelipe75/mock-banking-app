@@ -49,13 +49,11 @@ function mapDomainResultToHttp(result, res) {
     return res.status(500).json({ error: 'Internal Server Error' });
   }
 
-  const { success, transactionId, status, reason, idempotentReplay } = result;
+  const { success, transactionId, status, reason } = result;
 
   if (success === true && status === 'SUCCEEDED') {
-    const httpStatus = idempotentReplay === true ? 200 : 201;
-    return res.status(httpStatus).json({ transactionId, status });
+    return res.status(201).json({ transactionId, status });
   }
-
   if (success === false && status === 'REJECTED') {
     return res.status(422).json({ transactionId, status, reason });
   }
