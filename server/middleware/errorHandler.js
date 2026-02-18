@@ -20,9 +20,6 @@ function errorHandler(err, req, res, next) {
     return next(err);
   }
 
-  // Log internally for debugging
-  console.error('[ErrorHandler]', err);
-
   // Handle TransferSystemError
   if (err instanceof TransferSystemError) {
     return res.status(500).json({
