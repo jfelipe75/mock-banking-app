@@ -14,9 +14,9 @@
  * This test talks directly to the service layer (no HTTP).
  */
 
+const crypto = require('crypto');
 const knex = require('../../db/knex');
 const { transferFunds } = require('../../services/transferService');
-const crypto = require('crypto');
 
 describe('Transfer Service — TO_ACCOUNT_FROZEN Rejection', () => {
   let testUserId;
@@ -28,7 +28,6 @@ describe('Transfer Service — TO_ACCOUNT_FROZEN Rejection', () => {
   const initialToBalance = 2000;
   const transferAmount = 1000;
 
-  
   test('Transfer is REJECTED when toAccount is FROZEN', async () => {
     // ==================== ARRANGE ====================
 
@@ -36,7 +35,7 @@ describe('Transfer Service — TO_ACCOUNT_FROZEN Rejection', () => {
     const [user] = await knex('users')
       .insert({
         username: 'testuser_frozen_to',
-        password_hash: 'TEST_ONLY_HASH'
+        password_hash: 'TEST_ONLY_HASH',
       })
       .returning('*');
     testUserId = user.user_id;
@@ -46,7 +45,7 @@ describe('Transfer Service — TO_ACCOUNT_FROZEN Rejection', () => {
       .insert({
         user_id: testUserId,
         status: 'ACTIVE',
-        current_balance: initialFromBalance
+        current_balance: initialFromBalance,
       })
       .returning('*');
     fromAccountId = fromAccount.account_id;
@@ -56,7 +55,7 @@ describe('Transfer Service — TO_ACCOUNT_FROZEN Rejection', () => {
       .insert({
         user_id: testUserId,
         status: 'FROZEN',
-        current_balance: initialToBalance
+        current_balance: initialToBalance,
       })
       .returning('*');
     toAccountId = toAccount.account_id;
@@ -69,10 +68,10 @@ describe('Transfer Service — TO_ACCOUNT_FROZEN Rejection', () => {
     // Call transferFunds with valid inputs
     const result = await transferFunds({
       initiatorUserId: testUserId,
-      fromAccountId: fromAccountId,
-      toAccountId: toAccountId,
+      fromAccountId,
+      toAccountId,
       amount: transferAmount,
-      idempotencyKey: idempotencyKey
+      idempotencyKey,
     });
 
     // ==================== ASSERT ====================
@@ -82,7 +81,7 @@ describe('Transfer Service — TO_ACCOUNT_FROZEN Rejection', () => {
     expect(result.status).toBe('REJECTED');
     expect(result.reason).toBe('TO_ACCOUNT_NOT_ACTIVE');
 
-    const transactionId = result.transactionId;
+    const { transactionId } = result;
 
     // 2) Transaction row exists with status REJECTED and failure_reason
     const transactions = await knex('transactions')
@@ -118,7 +117,7 @@ describe('Transfer Service — TO_ACCOUNT_FROZEN Rejection', () => {
     expect(auditLogs).toHaveLength(2);
 
     // First audit log: ATTEMPTED
-    const attemptedLog = auditLogs.find(log => log.outcome === 'ATTEMPTED');
+    const attemptedLog = auditLogs.find((log) => log.outcome === 'ATTEMPTED');
     expect(attemptedLog).toBeDefined();
     expect(attemptedLog.actor_type).toBe('USER');
     expect(attemptedLog.actor_id).toBe(testUserId);
@@ -126,7 +125,7 @@ describe('Transfer Service — TO_ACCOUNT_FROZEN Rejection', () => {
     expect(attemptedLog.target_type).toBe('TRANSACTION');
 
     // Second audit log: REJECTED with reason
-    const rejectedLog = auditLogs.find(log => log.outcome === 'REJECTED');
+    const rejectedLog = auditLogs.find((log) => log.outcome === 'REJECTED');
     expect(rejectedLog).toBeDefined();
     expect(rejectedLog.actor_type).toBe('USER');
     expect(rejectedLog.actor_id).toBe(testUserId);

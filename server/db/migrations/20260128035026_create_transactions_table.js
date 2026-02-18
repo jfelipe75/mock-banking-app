@@ -59,22 +59,20 @@ exports.up = function(knex) {
         OR (from_account_id IS NOT NULL AND to_account_id IS NOT NULL)
         `);
 
-        table.check(`
+    table.check(`
         type <> 'DEPOSIT'
         OR (from_account_id IS NULL AND to_account_id IS NOT NULL)
         `);
 
-        table.check(`
+    table.check(`
         type <> 'WITHDRAWAL'
         OR (from_account_id IS NOT NULL AND to_account_id IS NULL)
         `);
-
-    })
+  })
     .then(() => knex.raw(`
         CREATE UNIQUE INDEX uq_transfer_idempotency_per_user 
         ON transactions (initiator_user_id, idempotency_key, type)
         WHERE type = 'TRANSFER' AND idempotency_key IS NOT NULL`));
-  
 };
 
 /**

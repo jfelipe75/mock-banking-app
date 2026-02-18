@@ -16,12 +16,11 @@
  * This test talks directly to the service layer (no HTTP).
  */
 
+const crypto = require('crypto');
 const knex = require('../../db/knex');
 const { transferFunds } = require('../../services/transferService');
-const crypto = require('crypto');
 
 describe('Transfer Service — SYSTEM FAILURE during credit update', () => {
-
   let testUserId;
   let fromAccountId;
   let toAccountId;
@@ -32,7 +31,6 @@ describe('Transfer Service — SYSTEM FAILURE during credit update', () => {
   const transferAmount = 3000;
 
   test('Rollback occurs if credit step fails after debit', async () => {
-
     // ==================== ARRANGE ====================
     // - create user
     // - create ACTIVE fromAccount with sufficient balance
@@ -42,7 +40,7 @@ describe('Transfer Service — SYSTEM FAILURE during credit update', () => {
     const [user] = await knex('users')
       .insert({
         username: 'testuser_credit_fail',
-        password_hash: 'TEST_ONLY_HASH'
+        password_hash: 'TEST_ONLY_HASH',
       })
       .returning('*');
     testUserId = user.user_id;
@@ -51,7 +49,7 @@ describe('Transfer Service — SYSTEM FAILURE during credit update', () => {
       .insert({
         user_id: testUserId,
         status: 'ACTIVE',
-        current_balance: initialFromBalance
+        current_balance: initialFromBalance,
       })
       .returning('*');
     fromAccountId = fromAccount.account_id;
@@ -60,7 +58,7 @@ describe('Transfer Service — SYSTEM FAILURE during credit update', () => {
       .insert({
         user_id: testUserId,
         status: 'ACTIVE',
-        current_balance: initialToBalance
+        current_balance: initialToBalance,
       })
       .returning('*');
     toAccountId = toAccount.account_id;
@@ -75,12 +73,12 @@ describe('Transfer Service — SYSTEM FAILURE during credit update', () => {
     await expect(
       transferFunds({
         initiatorUserId: testUserId,
-        fromAccountId: fromAccountId,
-        toAccountId: toAccountId,
+        fromAccountId,
+        toAccountId,
         amount: transferAmount,
-        idempotencyKey: idempotencyKey,
-        failpoint: 'AFTER_DEBIT_BEFORE_CREDIT'
-      })
+        idempotencyKey,
+        failpoint: 'AFTER_DEBIT_BEFORE_CREDIT',
+      }),
     ).rejects.toThrow('TRANSFER_SYSTEM_FAILURE: CREDIT_FAILED_ROLLBACK');
 
     // ==================== ASSERT ====================
@@ -111,7 +109,7 @@ describe('Transfer Service — SYSTEM FAILURE during credit update', () => {
 
     // Ledger entries must be empty
     const ledgerEntries = await knex('ledger_entries')
-     .where({ transaction_id: transaction.transaction_id });
+      .where({ transaction_id: transaction.transaction_id });
 
     expect(ledgerEntries).toHaveLength(0);
     // 3) Transactions table has exactly 1 row with status='FAILED' and failure_reason='CREDIT_FAILED_ROLLBACK'
@@ -124,11 +122,11 @@ describe('Transfer Service — SYSTEM FAILURE during credit update', () => {
 
     // 4) Audit logs must contain exactly ONE SYSTEM failure row
     const auditLogs = await knex('audit_logs')
-    .where({
+      .where({
         target_id: transaction.transaction_id,
         target_type: 'TRANSACTION',
-        action: 'TRANSFER'
-    });
+        action: 'TRANSFER',
+      });
 
     expect(auditLogs).toHaveLength(1);
 
@@ -140,6 +138,5 @@ describe('Transfer Service — SYSTEM FAILURE during credit update', () => {
     expect(failedLog.reason).toBe('CREDIT_FAILED_ROLLBACK');
     expect(failedLog.target_type).toBe('TRANSACTION');
     expect(failedLog.target_id).toBe(transaction.transaction_id);
-    })
-
+  });
 });

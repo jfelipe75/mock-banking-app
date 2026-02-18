@@ -18,6 +18,7 @@
  */
 
 const knex = require('../db/knex');
+const TransferSystemError = require('../errors/transferSystemError');
 
 async function transferFunds({
   initiatorUserId,
@@ -25,7 +26,7 @@ async function transferFunds({
   toAccountId,
   amount,
   idempotencyKey,
-  failpoint = null // test-only: inject failures for integration tests
+  failpoint = null, // test-only: inject failures for integration tests
 }) {
   /**
    * STEP 0 — Validate input shape (cheap, synchronous)
@@ -40,7 +41,7 @@ async function transferFunds({
     return { // pre-transaction validation
       success: false,
       error: 'INVALID_AMOUNT',
-      message: 'Amount must be greater than 0'
+      message: 'Amount must be greater than 0',
     };
   }
 
@@ -48,7 +49,7 @@ async function transferFunds({
     return {
       success: false,
       error: 'SAME_ACCOUNT',
-      message: 'Cannot transfer to the same account'
+      message: 'Cannot transfer to the same account',
     };
   }
 
@@ -56,7 +57,7 @@ async function transferFunds({
     return {
       success: false,
       error: 'MISSING_IDEMPOTENCY_KEY',
-      message: 'Idempotency key is required for TRANSFER'
+      message: 'Idempotency key is required for TRANSFER',
     };
   }
 
@@ -70,10 +71,10 @@ async function transferFunds({
    * - no balances change
    * - no ledger entries exist
    */
-  
+
   try {
     return await knex.transaction(async (trx) => { // this line is how we enforce atomicity
-        /**
+      /**
          * Every query that uses trx(...):
 
     - inside the same database transaction
@@ -92,20 +93,20 @@ async function transferFunds({
      * - return the stored response_payload
      * - DO NOT re-apply side effects
      */
-    const existingTransaction = await trx('transactions')
-      .where({
-        initiator_user_id: initiatorUserId,
-        idempotency_key: idempotencyKey,
-        type: 'TRANSFER'
-      })
-      .first(); // give me only the first row, not an array of rows
+      const existingTransaction = await trx('transactions')
+        .where({
+          initiator_user_id: initiatorUserId,
+          idempotency_key: idempotencyKey,
+          type: 'TRANSFER',
+        })
+        .first(); // give me only the first row, not an array of rows
 
-    if (existingTransaction) {
+      if (existingTransaction) {
       // Return stored response_payload for idempotent replay
-      return existingTransaction.response_payload;
-    }
+        return existingTransaction.response_payload;
+      }
 
-    /**
+      /**
      * STEP 3 — Create transaction row (PENDING)
      * ------------------------------------------
      * Insert into transactions:
@@ -117,21 +118,21 @@ async function transferFunds({
      * - amount
      * - idempotency_key
      */
-    const [transactionRow] = await trx('transactions')
-      .insert({
-        status: 'PENDING',
-        type: 'TRANSFER',
-        initiator_user_id: initiatorUserId,
-        from_account_id: fromAccountId,
-        to_account_id: toAccountId,
-        amount: amount,
-        idempotency_key: idempotencyKey
-      })
-      .returning('*'); // after inserting the row, give me back the full row
+      const [transactionRow] = await trx('transactions')
+        .insert({
+          status: 'PENDING',
+          type: 'TRANSFER',
+          initiator_user_id: initiatorUserId,
+          from_account_id: fromAccountId,
+          to_account_id: toAccountId,
+          amount,
+          idempotency_key: idempotencyKey,
+        })
+        .returning('*'); // after inserting the row, give me back the full row
 
-    const transactionId = transactionRow.transaction_id;
+      const transactionId = transactionRow.transaction_id;
 
-    /**
+      /**
      * STEP 4 — Audit ATTEMPT
      * ----------------------
      * Insert into audit_logs:
@@ -142,16 +143,16 @@ async function transferFunds({
      * - target_id = transaction_id
      * - outcome = ATTEMPTED
      */
-    await trx('audit_logs').insert({
-      actor_type: 'USER',
-      actor_id: initiatorUserId,
-      action: 'TRANSFER',
-      target_type: 'TRANSACTION',
-      target_id: transactionId,
-      outcome: 'ATTEMPTED'
-    });
+      await trx('audit_logs').insert({
+        actor_type: 'USER',
+        actor_id: initiatorUserId,
+        action: 'TRANSFER',
+        target_type: 'TRANSACTION',
+        target_id: transactionId,
+        outcome: 'ATTEMPTED',
+      });
 
-    /**
+      /**
      * STEP 5 — Business eligibility checks
      * ------------------------------------
      * - from_account exists and is ACTIVE
@@ -163,57 +164,57 @@ async function transferFunds({
      * - COMMIT transaction
      * - return rejection result
      */
-    const fromAccount = await trx('accounts')
-      .where({ account_id: fromAccountId })
-      .first();
+      const fromAccount = await trx('accounts')
+        .where({ account_id: fromAccountId })
+        .first();
 
-    const toAccount = await trx('accounts')
-      .where({ account_id: toAccountId })
-      .first();
+      const toAccount = await trx('accounts')
+        .where({ account_id: toAccountId })
+        .first();
 
-    let rejectionReason = null;
-// set the correct rejection_reason
-    if (!fromAccount) {
-      rejectionReason = 'FROM_ACCOUNT_NOT_FOUND';
-    } else if (fromAccount.status !== 'ACTIVE') {
-      rejectionReason = 'FROM_ACCOUNT_NOT_ACTIVE';
-    } else if (!toAccount) {
-      rejectionReason = 'TO_ACCOUNT_NOT_FOUND';
-    } else if (toAccount.status !== 'ACTIVE') {
-      rejectionReason = 'TO_ACCOUNT_NOT_ACTIVE';
-    }
-// if there is a rejection reason then mark transactions and audit log as rejected 
-    if (rejectionReason) {
-      const rejectionPayload = {
-        success: false,
-        transactionId: transactionId,
-        status: 'REJECTED',
-        reason: rejectionReason
-      };
-
-      await trx('transactions')
-        .where({ transaction_id: transactionId })
-        .update({
+      let rejectionReason = null;
+      // set the correct rejection_reason
+      if (!fromAccount) {
+        rejectionReason = 'FROM_ACCOUNT_NOT_FOUND';
+      } else if (fromAccount.status !== 'ACTIVE') {
+        rejectionReason = 'FROM_ACCOUNT_NOT_ACTIVE';
+      } else if (!toAccount) {
+        rejectionReason = 'TO_ACCOUNT_NOT_FOUND';
+      } else if (toAccount.status !== 'ACTIVE') {
+        rejectionReason = 'TO_ACCOUNT_NOT_ACTIVE';
+      }
+      // if there is a rejection reason then mark transactions and audit log as rejected
+      if (rejectionReason) {
+        const rejectionPayload = {
+          success: false,
+          transactionId,
           status: 'REJECTED',
-          failure_reason: rejectionReason,
-          response_payload: rejectionPayload
+          reason: rejectionReason,
+        };
+
+        await trx('transactions')
+          .where({ transaction_id: transactionId })
+          .update({
+            status: 'REJECTED',
+            failure_reason: rejectionReason,
+            response_payload: rejectionPayload,
+          });
+
+        await trx('audit_logs').insert({
+          actor_type: 'USER',
+          actor_id: initiatorUserId,
+          action: 'TRANSFER',
+          target_type: 'TRANSACTION',
+          target_id: transactionId,
+          outcome: 'REJECTED',
+          reason: rejectionReason,
         });
 
-      await trx('audit_logs').insert({
-        actor_type: 'USER',
-        actor_id: initiatorUserId,
-        action: 'TRANSFER',
-        target_type: 'TRANSACTION',
-        target_id: transactionId,
-        outcome: 'REJECTED',
-        reason: rejectionReason
-      });
+        // COMMIT transaction (implicit via return) and return rejection result
+        return rejectionPayload;
+      }
 
-      // COMMIT transaction (implicit via return) and return rejection result
-      return rejectionPayload;
-    }
-
-    /**
+      /**
      * STEP 6 — Atomic balance updates
      * -------------------------------
      * Perform conditional updates:
@@ -235,123 +236,123 @@ async function transferFunds({
      * - treat as REJECTED
      * - rollback via throw OR explicit handling
      */
-    const debitRowsAffected = await trx('accounts')
-      .where({ account_id: fromAccountId, status: 'ACTIVE' })
-      .whereRaw('current_balance >= ?', [amount])
-      .update({ // update in knex library returns the number of affected rows by default
-        current_balance: trx.raw('current_balance - ?', [amount])
-      });
-
-    if (debitRowsAffected === 0) {
-      // Insufficient funds or account state changed
-      const rejectionPayload = {
-        success: false,
-        transactionId: transactionId,
-        status: 'REJECTED',
-        reason: 'INSUFFICIENT_FUNDS'
-      };
-
-      await trx('transactions')
-        .where({ transaction_id: transactionId })
-        .update({
-          status: 'REJECTED',
-          failure_reason: 'INSUFFICIENT_FUNDS',
-          response_payload: rejectionPayload
+      const debitRowsAffected = await trx('accounts')
+        .where({ account_id: fromAccountId, status: 'ACTIVE' })
+        .whereRaw('current_balance >= ?', [amount])
+        .update({ // update in knex library returns the number of affected rows by default
+          current_balance: trx.raw('current_balance - ?', [amount]),
         });
 
-      await trx('audit_logs').insert({
-        actor_type: 'USER',
-        actor_id: initiatorUserId,
-        action: 'TRANSFER',
-        target_type: 'TRANSACTION',
-        target_id: transactionId,
-        outcome: 'REJECTED',
-        reason: 'INSUFFICIENT_FUNDS'
-      });
+      if (debitRowsAffected === 0) {
+      // Insufficient funds or account state changed
+        const rejectionPayload = {
+          success: false,
+          transactionId,
+          status: 'REJECTED',
+          reason: 'INSUFFICIENT_FUNDS',
+        };
 
-      return rejectionPayload;
-    }
+        await trx('transactions')
+          .where({ transaction_id: transactionId })
+          .update({
+            status: 'REJECTED',
+            failure_reason: 'INSUFFICIENT_FUNDS',
+            response_payload: rejectionPayload,
+          });
 
-    // TEST-ONLY: Failpoint injection for integration tests
-    if (failpoint === 'AFTER_DEBIT_BEFORE_CREDIT') {
-      throw new Error('CREDIT_FAILED_ROLLBACK');
-    }
+        await trx('audit_logs').insert({
+          actor_type: 'USER',
+          actor_id: initiatorUserId,
+          action: 'TRANSFER',
+          target_type: 'TRANSACTION',
+          target_id: transactionId,
+          outcome: 'REJECTED',
+          reason: 'INSUFFICIENT_FUNDS',
+        });
 
-    const creditRowsAffected = await trx('accounts')
-      .where({ account_id: toAccountId, status: 'ACTIVE' })
-      .update({
-        current_balance: trx.raw('current_balance + ?', [amount])
-      });
+        return rejectionPayload;
+      }
 
-    if (creditRowsAffected === 0) {
+      // TEST-ONLY: Failpoint injection for integration tests
+      if (failpoint === 'AFTER_DEBIT_BEFORE_CREDIT') {
+        throw new Error('CREDIT_FAILED_ROLLBACK');
+      }
+
+      const creditRowsAffected = await trx('accounts')
+        .where({ account_id: toAccountId, status: 'ACTIVE' })
+        .update({
+          current_balance: trx.raw('current_balance + ?', [amount]),
+        });
+
+      if (creditRowsAffected === 0) {
       // Credit failed (account state changed during transaction)
       // This should be very rare given the eligibility check above
       // Throw to rollback the entire transaction including the debit
-      throw new Error('CREDIT_FAILED_ROLLBACK');
+        throw new Error('CREDIT_FAILED_ROLLBACK');
       // NOTE:
       // This represents a system failure.
       // Transaction remains PENDING and may be marked FAILED by a recovery process.
-    }
+      }
 
-    /**
+      /**
      * STEP 7 — Write ledger entries (ONLY if balance updates succeeded)
      * -----------------------------------------------------------------
      * Insert two rows into ledger_entries:
      * - debit entry (negative amount)
      * - credit entry (positive amount)
      */
-    await trx('ledger_entries').insert([
-      {
-        account_id: fromAccountId,
-        transaction_id: transactionId,
-        amount: -amount // debit entry (negative)
-      },
-      {
-        account_id: toAccountId,
-        transaction_id: transactionId,
-        amount: amount // credit entry (positive)
-      }
-    ]);
+      await trx('ledger_entries').insert([
+        {
+          account_id: fromAccountId,
+          transaction_id: transactionId,
+          amount: -amount, // debit entry (negative)
+        },
+        {
+          account_id: toAccountId,
+          transaction_id: transactionId,
+          amount, // credit entry (positive)
+        },
+      ]);
 
-    /**
+      /**
      * STEP 8 — Mark transaction SUCCEEDED
      * -----------------------------------
      * Update transactions.status = SUCCEEDED
      * Store response_payload for idempotent replay
      */
-    const successPayload = {
-      success: true,
-      transactionId: transactionId,
-      status: 'SUCCEEDED',
-      fromAccountId: fromAccountId,
-      toAccountId: toAccountId,
-      amount: amount
-    };
-
-    await trx('transactions')
-      .where({ transaction_id: transactionId })
-      .update({
+      const successPayload = {
+        success: true,
+        transactionId,
         status: 'SUCCEEDED',
-        response_payload: successPayload
-      });
+        fromAccountId,
+        toAccountId,
+        amount,
+      };
 
-    /**
+      await trx('transactions')
+        .where({ transaction_id: transactionId })
+        .update({
+          status: 'SUCCEEDED',
+          response_payload: successPayload,
+        });
+
+      /**
      * STEP 9 — Audit SUCCESS
      * ----------------------
      * Insert into audit_logs:
      * - action = TRANSFER
      * - outcome = SUCCEEDED
      */
-    await trx('audit_logs').insert({
-      actor_type: 'USER',
-      actor_id: initiatorUserId,
-      action: 'TRANSFER',
-      target_type: 'TRANSACTION',
-      target_id: transactionId,
-      outcome: 'SUCCEEDED'
-    });
+      await trx('audit_logs').insert({
+        actor_type: 'USER',
+        actor_id: initiatorUserId,
+        action: 'TRANSFER',
+        target_type: 'TRANSACTION',
+        target_id: transactionId,
+        outcome: 'SUCCEEDED',
+      });
 
-    /**
+      /**
      * STEP 10 — Commit DB transaction
      * --------------------------------
      * At this point:
@@ -359,9 +360,9 @@ async function transferFunds({
      * - ledger is correct
      * - audit reflects reality
      */
-    // Commit is implicit when the transaction callback returns successfully
+      // Commit is implicit when the transaction callback returns successfully
 
-    /**
+      /**
      * STEP 11 — Return domain result
      * ------------------------------
      * Return:
@@ -369,7 +370,7 @@ async function transferFunds({
      * - status
      * - balances (optional)
      */
-    return successPayload;
+      return successPayload;
     });
   } catch (error) {
     // Log system failure (transaction is already rolled back by Knex)
@@ -379,7 +380,7 @@ async function transferFunds({
       toAccountId,
       amount,
       idempotencyKey,
-      error: error.message
+      error: error.message,
     });
 
     /**
@@ -393,12 +394,12 @@ async function transferFunds({
     try {
       await knex.transaction(async (trx) => {
         // The main transaction rolled back, so the PENDING row may not exist.
-// If it exists (rare), update it. Otherwise create a FAILED record.
+        // If it exists (rare), update it. Otherwise create a FAILED record.
         const existingTx = await trx('transactions')
           .where({
             initiator_user_id: initiatorUserId,
             idempotency_key: idempotencyKey,
-            type: 'TRANSFER'
+            type: 'TRANSFER',
           })
           .first();
 
@@ -414,10 +415,10 @@ async function transferFunds({
               failure_reason: failureReason,
               response_payload: {
                 success: false,
-                transactionId: transactionId,
+                transactionId,
                 status: 'FAILED',
-                reason: failureReason
-              }
+                reason: failureReason,
+              },
             });
         } else {
           // Create a new FAILED transaction record
@@ -428,9 +429,9 @@ async function transferFunds({
               initiator_user_id: initiatorUserId,
               from_account_id: fromAccountId,
               to_account_id: toAccountId,
-              amount: amount,
+              amount,
               idempotency_key: idempotencyKey,
-              failure_reason: failureReason
+              failure_reason: failureReason,
             })
             .returning('*');
           transactionId = newTx.transaction_id;
@@ -444,7 +445,7 @@ async function transferFunds({
           target_type: 'TRANSACTION',
           target_id: transactionId,
           outcome: 'FAILED',
-          reason: failureReason
+          reason: failureReason,
         });
       });
     } catch (recordError) {
@@ -452,10 +453,10 @@ async function transferFunds({
     }
 
     // Rethrow cleanly
-    throw new Error(`TRANSFER_SYSTEM_FAILURE: ${error.message}`);
+    throw new TransferSystemError(`TRANSFER_SYSTEM_FAILURE: ${error.message}`);
   }
 }
 
 module.exports = {
-  transferFunds
+  transferFunds,
 };
