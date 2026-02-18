@@ -17,7 +17,7 @@ class TransferSystemError extends Error {
 
     this.name = 'TransferSystemError';
     this.code = 'TRANSFER_SYSTEM_FAILURE';
-    
+
     if (options.metadata) {
       this.metadata = options.metadata;
     }

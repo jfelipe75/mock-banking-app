@@ -11,9 +11,9 @@
  * This test talks directly to the service layer (no HTTP).
  */
 
+const crypto = require('crypto');
 const knex = require('../../db/knex');
 const { transferFunds } = require('../../services/transferService');
-const crypto = require('crypto');
 
 describe('Transfer Service — Successful Transfer', () => {
   let testUserId;
@@ -21,15 +21,14 @@ describe('Transfer Service — Successful Transfer', () => {
   let toAccountId;
   let idempotencyKey;
 
-
   test('Successful transfer updates balances, ledger, transactions, and audit logs correctly', async () => {
     // ==================== ARRANGE ====================
-    
+
     // Create a test user
     const [user] = await knex('users')
       .insert({
         username: 'testuser',
-        password_hash: 'TEST_ONLY_HASH'
+        password_hash: 'TEST_ONLY_HASH',
       })
       .returning('*');
     testUserId = user.user_id;
@@ -39,7 +38,7 @@ describe('Transfer Service — Successful Transfer', () => {
       .insert({
         user_id: testUserId,
         status: 'ACTIVE',
-        current_balance: 10000
+        current_balance: 10000,
       })
       .returning('*');
     fromAccountId = fromAccount.account_id;
@@ -48,7 +47,7 @@ describe('Transfer Service — Successful Transfer', () => {
       .insert({
         user_id: testUserId,
         status: 'ACTIVE',
-        current_balance: 5000
+        current_balance: 5000,
       })
       .returning('*');
     toAccountId = toAccount.account_id;
@@ -57,13 +56,13 @@ describe('Transfer Service — Successful Transfer', () => {
     idempotencyKey = crypto.randomUUID();
 
     // ==================== ACT ====================
-    
+
     const result = await transferFunds({
       initiatorUserId: testUserId,
-      fromAccountId: fromAccountId,
-      toAccountId: toAccountId,
+      fromAccountId,
+      toAccountId,
       amount: 3000,
-      idempotencyKey: idempotencyKey
+      idempotencyKey,
     });
 
     // ==================== ASSERT ====================
@@ -76,12 +75,12 @@ describe('Transfer Service — Successful Transfer', () => {
     expect(result.toAccountId).toBe(toAccountId);
     expect(result.transactionId).toBeDefined();
 
-    const transactionId = result.transactionId;
+    const { transactionId } = result;
 
     // 2) Transactions table assertions
     const transactions = await knex('transactions')
       .where({ transaction_id: transactionId });
-    
+
     expect(transactions).toHaveLength(1);
     expect(transactions[0].status).toBe('SUCCEEDED');
     expect(transactions[0].type).toBe('TRANSFER');
@@ -100,22 +99,22 @@ describe('Transfer Service — Successful Transfer', () => {
       .first();
 
     expect(Number(updatedFromAccount.current_balance)).toBe(7000); // 10000 - 3000
-    expect(Number(updatedToAccount.current_balance)).toBe(8000);   // 5000 + 3000
+    expect(Number(updatedToAccount.current_balance)).toBe(8000); // 5000 + 3000
 
     // 4) Ledger entries assertions — exactly TWO rows for this transaction
     const ledgerEntries = await knex('ledger_entries')
-      .where({ transaction_id: transactionId })
+      .where({ transaction_id: transactionId });
 
     expect(ledgerEntries).toHaveLength(2);
 
     // Debit entry (negative amount)
-    const debitEntry = ledgerEntries.find(e => Number(e.amount) < 0);
+    const debitEntry = ledgerEntries.find((e) => Number(e.amount) < 0);
     expect(debitEntry).toBeDefined();
     expect(Number(debitEntry.amount)).toBe(-3000);
     expect(debitEntry.account_id).toBe(fromAccountId);
 
     // Credit entry (positive amount)
-    const creditEntry = ledgerEntries.find(e => Number(e.amount) > 0);
+    const creditEntry = ledgerEntries.find((e) => Number(e.amount) > 0);
     expect(creditEntry).toBeDefined();
     expect(Number(creditEntry.amount)).toBe(3000);
     expect(creditEntry.account_id).toBe(toAccountId);
@@ -128,7 +127,7 @@ describe('Transfer Service — Successful Transfer', () => {
     expect(auditLogs).toHaveLength(2);
 
     // First audit log: ATTEMPTED
-    const attemptedLog = auditLogs.find(log => log.outcome === 'ATTEMPTED');
+    const attemptedLog = auditLogs.find((log) => log.outcome === 'ATTEMPTED');
     expect(attemptedLog).toBeDefined();
     expect(attemptedLog.actor_type).toBe('USER');
     expect(attemptedLog.actor_id).toBe(testUserId);
@@ -136,7 +135,7 @@ describe('Transfer Service — Successful Transfer', () => {
     expect(attemptedLog.target_type).toBe('TRANSACTION');
 
     // Second audit log: SUCCEEDED
-    const succeededLog = auditLogs.find(log => log.outcome === 'SUCCEEDED');
+    const succeededLog = auditLogs.find((log) => log.outcome === 'SUCCEEDED');
     expect(succeededLog).toBeDefined();
     expect(succeededLog.actor_type).toBe('USER');
     expect(succeededLog.actor_id).toBe(testUserId);

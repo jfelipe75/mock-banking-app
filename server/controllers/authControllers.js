@@ -49,7 +49,6 @@ exports.loginUser = async (req, res) => {
   res.send(user);
 };
 
-
 exports.showMe = async (req, res) => {
   // no cookie with an id => Not authenticated.
   if (!req.session.userId) {

@@ -1,4 +1,5 @@
 const express = require('express');
+
 const router = express.Router();
 
 const validateTransferRequest = require('../middleware/validateTransferRequest');
@@ -9,7 +10,7 @@ router.post(
   '/',
   checkAuthentication,
   validateTransferRequest,
-  transferController.createTransfer
+  transferController.createTransfer,
 );
 
 module.exports = router;

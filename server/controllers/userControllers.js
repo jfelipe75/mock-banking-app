@@ -1,6 +1,6 @@
 const User = require('../models/User');
 
-/* 
+/*
 GET /api/users
 Returns an array of all users in the database
 */
@@ -9,7 +9,7 @@ exports.listUsers = async (req, res) => {
   res.send(users);
 };
 
-/* 
+/*
 GET /api/users/:id
 Returns a single user (if found)
 */
@@ -24,7 +24,7 @@ exports.showUser = async (req, res) => {
   res.send(user);
 };
 
-/* 
+/*
 PATCH /api/users/:id
 Updates a single user (if found) and only if authorized
 */

@@ -11,9 +11,9 @@
  * This test talks directly to the service layer (no HTTP).
  */
 
+const crypto = require('crypto');
 const knex = require('../../db/knex');
 const { transferFunds } = require('../../services/transferService');
-const crypto = require('crypto');
 
 describe('Transfer Service — INSUFFICIENT_FUNDS Rejection', () => {
   let testUserId;
@@ -24,7 +24,6 @@ describe('Transfer Service — INSUFFICIENT_FUNDS Rejection', () => {
   const initialToBalance = 2000;
   const transferAmount = 1000; // Greater than fromAccount balance
 
-  
   test('Transfer is REJECTED when amount exceeds fromAccount balance', async () => {
     // ==================== ARRANGE ====================
 
@@ -32,7 +31,7 @@ describe('Transfer Service — INSUFFICIENT_FUNDS Rejection', () => {
     const [user] = await knex('users')
       .insert({
         username: 'testuser_insufficient',
-        password_hash: 'TEST_ONLY_HASH'
+        password_hash: 'TEST_ONLY_HASH',
       })
       .returning('*');
     testUserId = user.user_id;
@@ -43,7 +42,7 @@ describe('Transfer Service — INSUFFICIENT_FUNDS Rejection', () => {
       .insert({
         user_id: testUserId,
         status: 'ACTIVE',
-        current_balance: initialFromBalance
+        current_balance: initialFromBalance,
       })
       .returning('*');
     fromAccountId = fromAccount.account_id;
@@ -53,7 +52,7 @@ describe('Transfer Service — INSUFFICIENT_FUNDS Rejection', () => {
       .insert({
         user_id: testUserId,
         status: 'ACTIVE',
-        current_balance: initialToBalance
+        current_balance: initialToBalance,
       })
       .returning('*');
     toAccountId = toAccount.account_id;
@@ -66,10 +65,10 @@ describe('Transfer Service — INSUFFICIENT_FUNDS Rejection', () => {
     // Call transferFunds() with amount greater than available balance
     const result = await transferFunds({
       initiatorUserId: testUserId,
-      fromAccountId: fromAccountId,
-      toAccountId: toAccountId,
+      fromAccountId,
+      toAccountId,
       amount: transferAmount,
-      idempotencyKey: idempotencyKey
+      idempotencyKey,
     });
 
     // ==================== ASSERT ====================
@@ -79,7 +78,7 @@ describe('Transfer Service — INSUFFICIENT_FUNDS Rejection', () => {
     expect(result.status).toBe('REJECTED');
     expect(result.reason).toBe('INSUFFICIENT_FUNDS');
 
-    const transactionId = result.transactionId;
+    const { transactionId } = result;
 
     // 2) Transactions table: exactly 1 row with status = REJECTED, type = TRANSFER
     const transactions = await knex('transactions')
@@ -115,7 +114,7 @@ describe('Transfer Service — INSUFFICIENT_FUNDS Rejection', () => {
     expect(auditLogs).toHaveLength(2);
 
     // First audit log: ATTEMPTED
-    const attemptedLog = auditLogs.find(log => log.outcome === 'ATTEMPTED');
+    const attemptedLog = auditLogs.find((log) => log.outcome === 'ATTEMPTED');
     expect(attemptedLog).toBeDefined();
     expect(attemptedLog.actor_type).toBe('USER');
     expect(attemptedLog.actor_id).toBe(testUserId);
@@ -123,7 +122,7 @@ describe('Transfer Service — INSUFFICIENT_FUNDS Rejection', () => {
     expect(attemptedLog.target_type).toBe('TRANSACTION');
 
     // Second audit log: REJECTED with reason = 'INSUFFICIENT_FUNDS'
-    const rejectedLog = auditLogs.find(log => log.outcome === 'REJECTED');
+    const rejectedLog = auditLogs.find((log) => log.outcome === 'REJECTED');
     expect(rejectedLog).toBeDefined();
     expect(rejectedLog.actor_type).toBe('USER');
     expect(rejectedLog.actor_id).toBe(testUserId);
