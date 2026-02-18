@@ -21,7 +21,7 @@ const transferService = require('../services/transferService');
  */
 async function createTransfer(req, res, next) {
   try {
-    const initiatorUserId = req.user.id;
+    const initiatorUserId = req.session.userId;
     const { fromAccountId, toAccountId, amount } = req.body;
     const idempotencyKey = req.header('Idempotency-Key');
 
