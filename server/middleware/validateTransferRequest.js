@@ -57,7 +57,7 @@ module.exports = function validateTransferRequest(req, res, next) {
         success: false,  
         error: 'INVALID_TRANSFER',
         message: 'source and destination account must differ'
-    })
+    });
   }
   //  Business-shape validation (not DB logic)
   if (amount <= 0) {
