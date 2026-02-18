@@ -11,11 +11,15 @@ const handleCookieSessions = require('./middleware/handleCookieSessions');
 const checkAuthentication = require('./middleware/checkAuthentication');
 const logRoutes = require('./middleware/logRoutes');
 const logErrors = require('./middleware/logErrors');
+const errorHandler = require('./middleware/errorHandler');
 
 // controller imports
 const authControllers = require('./controllers/authControllers');
 const userControllers = require('./controllers/userControllers');
+
+// routes imports
 const transferRoutes = require('./routes/transferRoutes');
+
 const app = express();
 
 // middleware
@@ -49,7 +53,6 @@ app.patch('/api/users/:id', checkAuthentication, userControllers.updateUser);
 
 app.use('/api/transfers', transferRoutes);
 
-
 ///////////////////////////////
 // Fallback Routes
 ///////////////////////////////
@@ -62,6 +65,12 @@ app.get('*', (req, res, next) => {
 });
 
 app.use(logErrors);
+
+///////////////////////////////
+// Global Error Handler (MUST BE LAST)
+///////////////////////////////
+
+app.use(errorHandler);
 
 ///////////////////////////////
 // Start Listening
