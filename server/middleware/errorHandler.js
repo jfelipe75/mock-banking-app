@@ -12,7 +12,7 @@
  * - Swallow unexpected errors silently
  */
 
-const TransferSystemError = require('../error/TransferSystemError');
+const TransferSystemError = require('../errors/transferSystemError');
 
 function errorHandler(err, req, res, next) {
   // If response already started, delegate
