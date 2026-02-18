@@ -16,7 +16,7 @@ const logErrors = (err, req, res, next) => {
     code: err.code || null,
     method: req.method,
     path: req.originalUrl,
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
   });
 
   // Pass error to the next error-handling middleware

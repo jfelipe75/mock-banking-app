@@ -30,7 +30,7 @@ async function createTransfer(req, res, next) {
       fromAccountId,
       toAccountId,
       amount,
-      idempotencyKey
+      idempotencyKey,
     });
 
     return mapDomainResultToHttp(result, res);
@@ -62,5 +62,5 @@ function mapDomainResultToHttp(result, res) {
 }
 
 module.exports = {
-  createTransfer
+  createTransfer,
 };

@@ -24,14 +24,14 @@ function errorHandler(err, req, res, next) {
   if (err instanceof TransferSystemError) {
     return res.status(500).json({
       success: false,
-      error: 'TRANSFER_SYSTEM_FAILURE'
+      error: 'TRANSFER_SYSTEM_FAILURE',
     });
   }
 
   // Fallback for unknown/unexpected errors
   return res.status(500).json({
     success: false,
-    error: 'INTERNAL_SERVER_ERROR'
+    error: 'INTERNAL_SERVER_ERROR',
   });
 }
 

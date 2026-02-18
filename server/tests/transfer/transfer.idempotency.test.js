@@ -11,9 +11,9 @@
  * This test talks directly to the service layer (no HTTP).
  */
 
+const crypto = require('crypto');
 const knex = require('../../db/knex');
 const { transferFunds } = require('../../services/transferService');
-const crypto = require('crypto');
 
 describe('Transfer Service — Idempotency Replay', () => {
   let testUserId;
@@ -32,7 +32,7 @@ describe('Transfer Service — Idempotency Replay', () => {
     const [user] = await knex('users')
       .insert({
         username: 'testuser_idempotency',
-        password_hash: 'TEST_ONLY_HASH'
+        password_hash: 'TEST_ONLY_HASH',
       })
       .returning('*');
     testUserId = user.user_id;
@@ -42,7 +42,7 @@ describe('Transfer Service — Idempotency Replay', () => {
       .insert({
         user_id: testUserId,
         status: 'ACTIVE',
-        current_balance: initialFromBalance
+        current_balance: initialFromBalance,
       })
       .returning('*');
     fromAccountId = fromAccount.account_id;
@@ -51,7 +51,7 @@ describe('Transfer Service — Idempotency Replay', () => {
       .insert({
         user_id: testUserId,
         status: 'ACTIVE',
-        current_balance: initialToBalance
+        current_balance: initialToBalance,
       })
       .returning('*');
     toAccountId = toAccount.account_id;
@@ -63,10 +63,10 @@ describe('Transfer Service — Idempotency Replay', () => {
 
     const firstResult = await transferFunds({
       initiatorUserId: testUserId,
-      fromAccountId: fromAccountId,
-      toAccountId: toAccountId,
+      fromAccountId,
+      toAccountId,
       amount: transferAmount,
-      idempotencyKey: idempotencyKey
+      idempotencyKey,
     });
 
     // Expect the transfer to SUCCEED
@@ -79,17 +79,17 @@ describe('Transfer Service — Idempotency Replay', () => {
     // Capture balances after first call
     const balancesAfterFirstCall = {
       from: await knex('accounts').where({ account_id: fromAccountId }).first(),
-      to: await knex('accounts').where({ account_id: toAccountId }).first()
+      to: await knex('accounts').where({ account_id: toAccountId }).first(),
     };
 
     // ==================== ACT (second call — replay) ====================
 
     const secondResult = await transferFunds({
       initiatorUserId: testUserId,
-      fromAccountId: fromAccountId,
-      toAccountId: toAccountId,
+      fromAccountId,
+      toAccountId,
       amount: transferAmount,
-      idempotencyKey: idempotencyKey
+      idempotencyKey,
     });
 
     // ==================== ASSERT ====================
@@ -114,8 +114,8 @@ describe('Transfer Service — Idempotency Replay', () => {
     expect(ledgerEntries).toHaveLength(2);
 
     // Verify debit and credit entries
-    const debitEntry = ledgerEntries.find(e => Number(e.amount) < 0);
-    const creditEntry = ledgerEntries.find(e => Number(e.amount) > 0);
+    const debitEntry = ledgerEntries.find((e) => Number(e.amount) < 0);
+    const creditEntry = ledgerEntries.find((e) => Number(e.amount) > 0);
 
     expect(debitEntry).toBeDefined();
     expect(Number(debitEntry.amount)).toBe(-transferAmount);
@@ -128,7 +128,7 @@ describe('Transfer Service — Idempotency Replay', () => {
     // 4) Account balances are unchanged after the second call
     const balancesAfterSecondCall = {
       from: await knex('accounts').where({ account_id: fromAccountId }).first(),
-      to: await knex('accounts').where({ account_id: toAccountId }).first()
+      to: await knex('accounts').where({ account_id: toAccountId }).first(),
     };
 
     expect(Number(balancesAfterSecondCall.from.current_balance))
@@ -140,7 +140,7 @@ describe('Transfer Service — Idempotency Replay', () => {
     expect(Number(balancesAfterSecondCall.from.current_balance))
       .toBe(initialFromBalance - transferAmount); // 10000 - 3000 = 7000
     expect(Number(balancesAfterSecondCall.to.current_balance))
-      .toBe(initialToBalance + transferAmount);   // 5000 + 3000 = 8000
+      .toBe(initialToBalance + transferAmount); // 5000 + 3000 = 8000
 
     // 5) Audit logs table still has only 2 rows: one ATTEMPTED, one SUCCEEDED
     const auditLogs = await knex('audit_logs')
@@ -150,7 +150,7 @@ describe('Transfer Service — Idempotency Replay', () => {
     expect(auditLogs).toHaveLength(2);
 
     // First audit log: ATTEMPTED
-    const attemptedLog = auditLogs.find(log => log.outcome === 'ATTEMPTED');
+    const attemptedLog = auditLogs.find((log) => log.outcome === 'ATTEMPTED');
     expect(attemptedLog).toBeDefined();
     expect(attemptedLog.actor_type).toBe('USER');
     expect(attemptedLog.actor_id).toBe(testUserId);
@@ -158,7 +158,7 @@ describe('Transfer Service — Idempotency Replay', () => {
     expect(attemptedLog.target_type).toBe('TRANSACTION');
 
     // Second audit log: SUCCEEDED
-    const succeededLog = auditLogs.find(log => log.outcome === 'SUCCEEDED');
+    const succeededLog = auditLogs.find((log) => log.outcome === 'SUCCEEDED');
     expect(succeededLog).toBeDefined();
     expect(succeededLog.actor_type).toBe('USER');
     expect(succeededLog.actor_id).toBe(testUserId);
