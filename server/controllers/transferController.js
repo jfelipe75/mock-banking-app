@@ -19,7 +19,7 @@ const transferService = require('../services/transferService');
 /**
  * POST /api/transfers
  */
-async function createTransfer(req, res, next) {
+exports.createTransfer = async function createTransfer(req, res, next) {
   try {
     const initiatorUserId = req.session.userId;
     const { fromAccountId, toAccountId, amount } = req.body;
@@ -37,7 +37,7 @@ async function createTransfer(req, res, next) {
   } catch (error) {
     return next(error);
   }
-}
+};
 
 /**
  * Maps domain result objects to HTTP responses.
@@ -60,7 +60,3 @@ function mapDomainResultToHttp(result, res) {
 
   return res.status(500).json({ error: 'Internal Server Error' });
 }
-
-module.exports = {
-  createTransfer,
-};
