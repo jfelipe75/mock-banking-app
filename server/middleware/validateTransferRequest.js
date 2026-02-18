@@ -43,12 +43,12 @@ module.exports = function validateTransferRequest(req, res, next) {
 
   // Decimal safety
   if (!Number.isInteger(amount * 100)) {
-  return res.status(400).json({
-    success: false,
-    error: 'INVALID_AMOUNT_PRECISION',
-    message: 'Amount must have at most 2 decimal places'
-  });
-}
+    return res.status(400).json({
+      success: false,
+      error: 'INVALID_AMOUNT_PRECISION',
+      message: 'Amount must have at most 2 decimal places'
+    });
+  }
 
   // Check for identical accounts
 
