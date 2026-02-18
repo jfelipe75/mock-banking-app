@@ -25,7 +25,7 @@ async function createTransfer(req, res, next) {
     const { fromAccountId, toAccountId, amount } = req.body;
     const idempotencyKey = req.header('Idempotency-Key');
 
-    const result = await transferService.executeTransfer({
+    const result = await transferService.transferFunds({
       initiatorUserId,
       fromAccountId,
       toAccountId,
