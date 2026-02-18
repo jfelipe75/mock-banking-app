@@ -13,7 +13,7 @@
 
 module.exports = function validateTransferRequest(req, res, next) {
   const { fromAccountId, toAccountId, amount } = req.body;
-  const idempotencyKey = req.header('idempotency-key');
+  const idempotencyKey = req.header('Idempotency-Key');
 
   //  Required fields check
   if (fromAccountId === undefined || toAccountId === undefined || amount === undefined) {
