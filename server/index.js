@@ -21,6 +21,10 @@ const userControllers = require('./controllers/userControllers');
 const transferRoutes = require('./routes/transferRoutes');
 
 const app = express();
+// Trust Render / reverse proxy in production
+if (process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1);
+} 
 
 // middleware
 app.use(handleCookieSessions); // adds a session property to each request representing the cookie
