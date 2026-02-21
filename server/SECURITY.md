@@ -8,6 +8,10 @@
 target:
 - 60 requests per minute per IP
 
+File Structure:
+
+middleware/globalLimiter
+
 2. Per-User Limiter
 - Limits request per authenticated user.
 

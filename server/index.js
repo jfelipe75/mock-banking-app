@@ -7,7 +7,9 @@ const path = require('path');
 const express = require('express');
 
 // middleware imports
+const globalLimiter = require('./middleware/globalLimiter');
 const handleCookieSessions = require('./middleware/handleCookieSessions');
+const { loginIpLimiter, loginUserLimiter } = require('./middleware/authRateLimiters');
 const checkAuthentication = require('./middleware/checkAuthentication');
 const logRoutes = require('./middleware/logRoutes');
 const logErrors = require('./middleware/logErrors');
@@ -26,10 +28,12 @@ if (process.env.NODE_ENV === 'production') {
   app.set('trust proxy', 1);
 } 
 
+
 // middleware
 app.use(handleCookieSessions); // adds a session property to each request representing the cookie
 app.use(logRoutes); // print information about each incoming request
 app.use(express.json()); // parse incoming request bodies as JSON
+app.use('/api', globalLimiter);
 app.use(express.static(path.join(__dirname, '../frontend/dist'))); // Serve static assets from the dist folder of the frontend
 
 /// ////////////////////////////
@@ -37,7 +41,12 @@ app.use(express.static(path.join(__dirname, '../frontend/dist'))); // Serve stat
 /// ////////////////////////////
 
 app.post('/api/auth/register', authControllers.registerUser);
-app.post('/api/auth/login', authControllers.loginUser);
+// enforce rate limiting per IP and user for /api/auth/login
+app.post('/api/auth/login', 
+  loginIpLimiter,  
+  loginUserLimiter,
+  authControllers.loginUser
+);
 app.get('/api/auth/me', authControllers.showMe);
 app.delete('/api/auth/logout', authControllers.logoutUser);
 
@@ -60,9 +69,12 @@ app.use('/api/transfers', transferRoutes);
 /// ////////////////////////////
 // Fallback Routes
 /// ////////////////////////////
+// API 404
+app.use('/api', (req, res) => {
+  res.status(404).json({ success: false, error: 'NOT_FOUND' });
+});
 
-// Requests meant for the API will be sent along to the router.
-// For all other requests, send back the index.html file in the dist folder.
+// frontend fallback
 app.get('*', (req, res, next) => {
   if (req.originalUrl.startsWith('/api')) return next();
   res.sendFile(path.join(__dirname, '../frontend/dist/index.html'));
