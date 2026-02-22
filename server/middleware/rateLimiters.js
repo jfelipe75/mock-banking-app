@@ -14,63 +14,46 @@
  */
 
 const rateLimit = require('express-rate-limit');
-/**
- * IMPLEMENTATION REQUIREMENTS:
- *
- * Create an IP-based rate limiter for /api/transfers.
- *
- * Requirements:
- * - Window: 1 minute
- * - Max: 60 requests per IP
- * - Standard headers enabled
- * - Legacy headers disabled
- * - Response:
- *   {
- *     success: false,
- *     error: 'RATE_LIMIT_EXCEEDED'
- *   }
- *
- * This limiter applies per IP address.
- */
+const { ipKeyGenerator } = require('express-rate-limit');
 
+/**
+ * IP-based rate limiter for /api/transfers
+ */
 const transferIpLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 60,
   standardHeaders: true,
   legacyHeaders: false,
-  message: {
-    success: false,
-    error: 'RATE_LIMIT_EXCEEDED'
+  skipSuccessfulRequests: false,
+  keyGenerator: ipKeyGenerator, // IPv6-safe
+  skip: (req) => req.method === 'OPTIONS',
+  handler: (_req, res) => {
+    return res.status(429).json({
+      success: false,
+      error: 'RATE_LIMIT_EXCEEDED'
+    });
   }
 });
 
 /**
- * IMPLEMENTATION REQUIREMENTS:
- *
- * Create a per-user rate limiter.
- *
- * Requirements:
- * - Window: 1 minute
- * - Max: 20 requests per authenticated user
- * - Key should be req.user.id
- * - If req.user is missing, fallback to IP
- * - Same response format as IP limiter
- *
- * Must NOT talk to database.
+ * Per-user rate limiter for /api/transfers
  */
-
 const transferUserLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 20,
   standardHeaders: true,
   legacyHeaders: false,
+  skipSuccessfulRequests: false,
   keyGenerator: (req) => {
-    return req.user?.id || req.ip;
+    // If authenticated, key by user id.
+    // Otherwise, fallback to IPv6-safe IP key.
+    return req.user?.id || ipKeyGenerator(req);
   },
-  handler: (req, res) => {
+  skip: (req) => req.method === 'OPTIONS',
+  handler: (_req, res) => {
     return res.status(429).json({
-        success: false,
-        error: 'RATE_LIMIT_EXCEEDED'
+      success: false,
+      error: 'RATE_LIMIT_EXCEEDED'
     });
   }
 });

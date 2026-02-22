@@ -1,4 +1,4 @@
-import { fetchHandler, getPostOptions, deleteOptions } from "../utils/fetchingUtils";
+import { fetchHandler, getPostOptions, deleteOptions, basicFetchOptions } from "../utils/fetchingUtils";
 
 const baseUrl = '/api/auth';
 
@@ -15,5 +15,5 @@ export const logUserOut = async () => {
 };
 
 export const checkForLoggedInUser = async () => {
-  return await fetchHandler(`${baseUrl}/me`);
+  return await fetchHandler(`${baseUrl}/me`,  { credentials: 'include' });
 };

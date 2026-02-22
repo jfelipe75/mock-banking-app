@@ -8,12 +8,14 @@ const express = require('express');
 
 // middleware imports
 const globalLimiter = require('./middleware/globalLimiter');
+const corsConfig = require('./middleware/corsConfig');
 const handleCookieSessions = require('./middleware/handleCookieSessions');
 const { loginIpLimiter, loginUserLimiter } = require('./middleware/authRateLimiters');
 const checkAuthentication = require('./middleware/checkAuthentication');
 const logRoutes = require('./middleware/logRoutes');
 const logErrors = require('./middleware/logErrors');
 const errorHandler = require('./middleware/errorHandler');
+
 
 // controller imports
 const authControllers = require('./controllers/authControllers');
@@ -23,16 +25,21 @@ const userControllers = require('./controllers/userControllers');
 const transferRoutes = require('./routes/transferRoutes');
 
 const app = express();
+
+
 // Trust Render / reverse proxy in production
 if (process.env.NODE_ENV === 'production') {
   app.set('trust proxy', 1);
 } 
 
-
 // middleware
 app.use(handleCookieSessions); // adds a session property to each request representing the cookie
 app.use(logRoutes); // print information about each incoming request
 app.use(express.json()); // parse incoming request bodies as JSON
+
+// CORS middleware
+//app.use(corsConfig);
+
 app.use('/api', globalLimiter);
 app.use(express.static(path.join(__dirname, '../frontend/dist'))); // Serve static assets from the dist folder of the frontend
 

@@ -1,5 +1,6 @@
 const User = require('../models/User');
 
+
 exports.registerUser = async (req, res) => {
   // Request needs a body
   if (!req.body) {
@@ -21,6 +22,7 @@ exports.registerUser = async (req, res) => {
 };
 
 exports.loginUser = async (req, res) => {
+  console.log('LOGIN HIT', req.body.username);
   // Request needs a body
   if (!req.body) {
     return res.status(400).send({ message: 'Username and password required' });
@@ -37,6 +39,7 @@ exports.loginUser = async (req, res) => {
   if (!user) {
     return res.status(404).send({ message: 'User not found.' });
   }
+  console.log('login payload user=', user);
 
   // Password must match
   const isPasswordValid = await user.isValidPassword(password);

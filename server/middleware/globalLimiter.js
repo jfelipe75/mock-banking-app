@@ -21,6 +21,7 @@
  */
 
 const rateLimit = require('express-rate-limit');
+const { ipKeyGenerator } = rateLimit;
 
 const globalLimiter = rateLimit({
   windowMs: 60 * 1000,
@@ -28,7 +29,8 @@ const globalLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   skipSuccessfulRequests: false,
-  keyGenerator: (req) => req.ip,
+  keyGenerator: ipKeyGenerator,
+  skip: (req) => req.method === 'OPTIONS',
   handler: (_req, res) => {
     return res.status(429).json({
       success: false,
