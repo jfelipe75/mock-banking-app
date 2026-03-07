@@ -29,7 +29,10 @@ exports.up = function (knex) {
     table.check('amount <> 0');
 
     // access pattern
-    table.index(['account_id', 'created_at'], 'idx_ledger_account_created_at');
+    table.index(
+      ['account_id', knex.raw('created_at DESC'), knex.raw('ledger_entry_id DESC')],
+      'idx_ledger_account_created_at'
+    );
   });
 };
 

@@ -12,6 +12,7 @@ const corsConfig = require('./middleware/corsConfig');
 const handleCookieSessions = require('./middleware/handleCookieSessions');
 const { loginIpLimiter, loginUserLimiter } = require('./middleware/authRateLimiters');
 const checkAuthentication = require('./middleware/checkAuthentication');
+const { ensureCsrfToken, validateCsrfToken, getCsrfToken } = require('./middleware/csrfProtection');
 const logRoutes = require('./middleware/logRoutes');
 const logErrors = require('./middleware/logErrors');
 const errorHandler = require('./middleware/errorHandler');
@@ -34,8 +35,10 @@ if (process.env.NODE_ENV === 'production') {
 
 // middleware
 app.use(handleCookieSessions); // adds a session property to each request representing the cookie
-app.use(logRoutes); // print information about each incoming request
 app.use(express.json()); // parse incoming request bodies as JSON
+app.use(ensureCsrfToken); // generates CSRF token for authenticated sessions
+app.use(validateCsrfToken); // validates CSRF token on state-changing requests
+app.use(logRoutes); // print information about each incoming request
 
 // CORS middleware
 //app.use(corsConfig);
@@ -55,6 +58,7 @@ app.post('/api/auth/login',
   authControllers.loginUser
 );
 app.get('/api/auth/me', authControllers.showMe);
+app.get('/api/auth/csrf', getCsrfToken); // CSRF token endpoint (authenticated only)
 app.delete('/api/auth/logout', authControllers.logoutUser);
 
 /// ////////////////////////////

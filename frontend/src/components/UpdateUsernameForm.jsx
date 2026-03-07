@@ -1,30 +1,78 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { updateUsername } from "../adapters/user-adapter";
+import { Button, Input, FormField, Alert } from "./ui";
 
 export default function UpdateUsernameForm({ currentUser, setCurrentUser }) {
   const navigate = useNavigate();
+  const [username, setUsername] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [success, setSuccess] = useState(false);
+
   const handleSubmit = async (event) => {
     event.preventDefault();
-    const formData = new FormData(event.target);
-    const [user, error] = await updateUsername(Object.fromEntries(formData));
+    setError(null);
+    setSuccess(false);
+    setLoading(true);
+
+    const [user, err] = await updateUsername({ id: currentUser.id, username });
+    
     // If our user isn't who they say they are
     // (an auth error on update) log them out
-    // We added the httpStatus as a custom cause in our error
-    if (error?.cause > 400 && error?.cause < 500) {
+    if (err?.cause > 400 && err?.cause < 500) {
       setCurrentUser(null);
       return navigate('/');
     }
 
+    if (err) {
+      setError(err.message || 'Failed to update username');
+      setLoading(false);
+      return;
+    }
+
     setCurrentUser(user);
-    event.target.reset();
+    setUsername('');
+    setSuccess(true);
+    setLoading(false);
   };
 
-  return <form onSubmit={handleSubmit} aria-labelledby="update-heading">
-    <h2 id="update-heading">Update User {currentUser.username} </h2>
-    <label htmlFor='username'>New Username</label>
-    <input type='text' id='username' name='username' />
-    <input type="hidden" name="id" value={currentUser.id} />
+  return (
+    <form onSubmit={handleSubmit} className="update-form" aria-labelledby="update-heading">
+      {error && (
+        <Alert variant="error" dismissible onDismiss={() => setError(null)}>
+          {error}
+        </Alert>
+      )}
+      
+      {success && (
+        <Alert variant="success" dismissible onDismiss={() => setSuccess(false)}>
+          Username updated successfully!
+        </Alert>
+      )}
 
-    <button>Update Username</button>
-  </form>;
+      <FormField label="New Username" id="username" required>
+        <Input
+          type="text"
+          id="username"
+          name="username"
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+          placeholder="Enter new username"
+          disabled={loading}
+        />
+      </FormField>
+
+      <div className="update-form-actions">
+        <Button 
+          type="submit" 
+          variant="primary" 
+          loading={loading}
+          disabled={!username.trim()}
+        >
+          Update Username
+        </Button>
+      </div>
+    </form>
+  );
 }

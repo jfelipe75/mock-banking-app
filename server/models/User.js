@@ -1,5 +1,6 @@
 const bcrypt = require('bcrypt');
 const knex = require('../db/knex');
+const translateDatabaseError = require('../utils/translateDatabaseError');
 
 const SALT_ROUNDS = 12;
 
@@ -28,6 +29,7 @@ class User {
 
   /**
    * Create a new user (hash password before storing)
+   * Translates database errors into domain-specific AuthErrors.
    */
   static async create(username, password) {
     const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
@@ -38,10 +40,14 @@ class User {
       RETURNING *
     `;
 
-    const result = await knex.raw(query, [username, passwordHash]);
-    const rawUserData = result.rows[0];
-
-    return new User(rawUserData);
+    try {
+      const result = await knex.raw(query, [username, passwordHash]);
+      const rawUserData = result.rows[0];
+      return new User(rawUserData);
+    } catch (err) {
+      // Pass all database errors through the centralized translator
+      throw translateDatabaseError(err);
+    }
   }
 
   /**

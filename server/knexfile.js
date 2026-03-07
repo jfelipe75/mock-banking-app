@@ -1,6 +1,7 @@
-require('dotenv').config({ path: '.env.test' });
-require('dotenv').config();
 const path = require('path');
+// This builds an absolute path to the .env file in the same folder as knexfile.js
+require('dotenv').config({ path: path.join(__dirname, '.env') }); 
+require('dotenv').config({ path: path.join(__dirname, '.env.test') });
 
 const migrationsDirectory = path.join(__dirname, 'db/migrations');
 const seedsDirectory = path.join(__dirname, '/db/seeds');

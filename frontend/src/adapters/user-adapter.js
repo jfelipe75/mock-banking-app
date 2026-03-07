@@ -1,18 +1,25 @@
-// These functions all take in a body and return an options object
-// with the provided body and the remaining options
-import { fetchHandler, getPatchOptions } from "../utils/fetchingUtils";
+import { apiFetch, patchOptions } from './apiClient';
 
 const baseUrl = '/api/users';
 
+/**
+ * Get all users.
+ */
 export const getAllUsers = async () => {
-  return await fetchHandler(baseUrl);
+  return await apiFetch(baseUrl);
 };
 
+/**
+ * Get a single user by ID.
+ */
 export const getUser = async (id) => {
-  return fetchHandler(`${baseUrl}/${id}`);
-}
+  return apiFetch(`${baseUrl}/${id}`);
+};
 
+/**
+ * Update a user's username.
+ */
 export const updateUsername = async ({ id, username }) => {
-  return fetchHandler(`${baseUrl}/${id}`, getPatchOptions({ id, username }))
-}
+  return apiFetch(`${baseUrl}/${id}`, patchOptions({ id, username }));
+};
 
